@@ -2,7 +2,7 @@ import os
 from khl import Bot, Message, PublicMessage, EventTypes, Event
 
 # token here
-bot = Bot(token="os.environ['TOKEN']")
+bot = Bot(token=os.environ['TOKEN'])
 
 @bot.command(name="hello")
 async def greet(msg: Message):
