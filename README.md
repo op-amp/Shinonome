@@ -1,2 +1,2 @@
 # Shinonome
-A multifunctional Kaiheila bot.
+A simple multifunctional KOOK bot.
