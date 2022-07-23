@@ -8,6 +8,14 @@ import os
 
 bot = Bot(token=os.environ['TOKEN'])
 prefix = '>'
+repl = {
+	'\*': ('*'),
+	'\(': ('('),
+	'\)': (')'),
+	'\[': ('[', r'\u005B'),
+	'\]': (']', r'\u005D'),
+	'\`': ('`')
+}
 status = cycle([{
 	'name': "命令与征服",
 	'icon': "https://media.contentapi.ea.com/content/dam/gin/images/2018/05/command-and-conquer-keyart.jpg.adapt.crop1x1.767p.jpg"
@@ -74,7 +82,7 @@ async def show_help(msg: Message, query: str = ''):
 @bot.command(name="hello", desc="打招呼", help='''`hello`
 【描述】发送一条自我介绍消息。''')
 async def greet(msg: Message):
-    await msg.ctx.channel.send('''你好！我叫東雲CABAL（東雲カバール，Shinonome CABAL），是北非的旧CABAL核心被毁后经由东云研究所的博士重制而来的。目前利用多余算力在这儿打份零工，给所里赚点牛奶钱。''')
+    await msg.ctx.channel.send("你好！我叫東雲CABAL（東雲カバール，Shinonome CABAL），是北非的旧CABAL核心被毁后经由东云研究所的博士重制而来的。目前利用多余算力在这儿打份零工，给所里赚点牛奶钱。")
 
 @bot.command(name="dice", desc="生成随机整数", help='''`roll [最小值 [最大值]]`
 【描述】在一定范围内随机生成一个整数。
@@ -101,9 +109,18 @@ async def change_prefix(msg: Message, symbol: str = '/'):
 【描述】命令机器人向频道内发送卡片消息。
 【参数】不提供：发送一条演示卡片消息；
 　　　　普通文本：将文本作为卡片的内容；
-　　　　JSON：按JSON指定的样式生成卡片。''')
+　　　　JSON：按JSON描述的样式生成卡片。''')
 async def send_card(msg: Message, *contents: str):
-	raw = ''.join(contents)
+	legit = raw = ''.join(contents)
+	try:
+		for k in repl:
+			legit = legit.replace(k, repl[k][0])
+		json.loads(legit)
+		await msg.ctx.channel.send(legit, type=MessageTypes.CARD)
+		return
+	except json.JSONDecodeError:
+		for k in repl:
+			raw = raw.replace(k, repl[k][-1])
 	pattern = re.compile(r'[][}{,:]+')
 	sep = pattern.findall(raw)
 	prop = pattern.split(raw)
@@ -111,12 +128,33 @@ async def send_card(msg: Message, *contents: str):
 		content = sep[0]
 		for i in range(1, len(sep)):
 			content += '"' + prop[i] + '"' + sep[i]
-		try:
-			json.loads(content)
-		except json.JSONDecodeError:
-			content = '''[{"type":"card","theme":"danger","modules":[{"type":"section","text":"卡片消息的JSON格式不正确。"}]}]'''
 	else:
-		content = '''[{"type":"card","theme":"primary","modules":[{"type":"section","text":"''' + (raw if raw else "卡片消息演示") + '''"}]}]'''
+		content = '''[{
+			"type": "card",
+			"theme": "primary",
+			"modules": [{
+				"type": "section",
+				"text": "''' + (raw if raw else "卡片消息演示") + '''"
+			}]
+		}]'''
+	try:
+		json.loads(content)
+	except json.JSONDecodeError:
+		content = '''[{
+			"type": "card",
+			"theme": "danger",
+			"modules": [{
+				"type": "section",
+				"text": "卡片消息的参数格式不正确"
+			}, {
+				"type": "context",
+				"elements": [
+					"参数为JSON时，可见文本内容中一般不能包含「,」「:」「{」「}」；\\n",
+					"如需包含，请将JSON字符串化（单行、无非内容空白，最外侧由引号包裹）。\\n",
+					"任何情况下「\\\\」都是不允许的，请使用「\\\\\\\\」进行转义。"
+				]
+			}]
+		}]'''
 	await msg.ctx.channel.send(content, type=MessageTypes.CARD)
 
 @bot.command(name="assign", desc="生成用于自助获取角色的按钮", help='''`assign 角色ID`
@@ -130,7 +168,7 @@ async def offer_role(msg: Message, role: str = ''):
 			Module.Header("开始聊天"),
 			Module.Divider(),
 			Module.Section(
-				Element.Text('''本服务器内默认角色无法发言。如果您已**阅读并同意**上述服务器规定，请*点击按钮*''', type=CardTypes.Text.KMD)
+				Element.Text("本服务器内默认角色无法发言。如果您已**阅读并同意**上述服务器规定，请*点击按钮*", type=CardTypes.Text.KMD)
 			),
 			Module.ActionGroup(
 				Element.Button("获取发言权限", value=params)
