@@ -17,21 +17,17 @@ repl = {
 	'\`': ('`')
 }
 status = cycle([{
-	'name': "命令与征服",
-	'icon': "https://media.contentapi.ea.com/content/dam/gin/images/2018/05/command-and-conquer-keyart.jpg.adapt.crop1x1.767p.jpg"
+	'name': "Act On Instinct",
+	'artist': "Frank Klepacki"
 }, {
-	'name': "日常",
-	'icon': "http://www.shinonome-lab.com/goods/img/LACM-4823L.jpg"
+	'name': "ヒャダインのカカカタ☆カタオモイ-C",
+	'artist': "前山田健一"
 }])
 
 @bot.task.add_interval(minutes=5)
 async def play():
-	curr = next(status)
-	games = await bot.list_game()
-	game = next(filter(lambda g: g.name == curr['name'], games), None)
-	if game is None:
-		game = await bot.create_game(curr['name'], icon=curr['icon'])
-	await bot.update_playing_game(game)
+	song = next(status)
+	await bot.client.update_listening_music(song['name'], song['artist'], "cloudmusic")
 
 @bot.task.add_date()
 async def ready():
