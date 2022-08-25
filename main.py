@@ -1,5 +1,6 @@
 from khl import Bot, Message, MessageTypes, Event, EventTypes
 from khl.card import CardMessage, Card, Module, Element, Types as CardTypes
+from khl.command import Rule as CmdRule
 from itertools import cycle
 from random import randint
 import json
@@ -10,30 +11,36 @@ bot = Bot(token=os.environ['TOKEN'])
 prefix = '>'
 repl = {
 	'\*': ('*'),
+	'\~': ('~'),
+	'\`': ('`'),
+	'\>': ('>'),
 	'\(': ('('),
 	'\)': (')'),
 	'\[': ('[', r'\u005B'),
-	'\]': (']', r'\u005D'),
-	'\`': ('`')
+	'\]': (']', r'\u005D')
 }
 status = cycle([{
-	'name': "Act On Instinct",
-	'artist': "Frank Klepacki"
+	'name': "命令与征服",
+	'icon': "https://media.contentapi.ea.com/content/dam/gin/images/2018/05/command-and-conquer-keyart.jpg.adapt.crop1x1.767p.jpg"
 }, {
-	'name': "ヒャダインのカカカタ☆カタオモイ-C",
-	'artist': "前山田健一"
+	'name': "日常",
+	'icon': "http://www.shinonome-lab.com/goods/img/LACM-4823L.jpg"
 }])
 
 @bot.task.add_interval(minutes=5)
 async def play():
-	song = next(status)
-	await bot.client.update_listening_music(song['name'], song['artist'], "cloudmusic")
+	curr = next(status)
+	games = await bot.client.fetch_game_list()
+	game = next(filter(lambda g: g.name == curr['name'], games), None)
+	if game is None:
+		game = await bot.client.register_game(curr['name'], icon=curr['icon'])
+	await bot.client.update_playing_game(game)
 
-@bot.task.add_date()
-async def ready():
-	await bot.fetch_me()
-	identity = bot.me.username + '#' + bot.me.identify_num
-	availability = "在线" if bot.me.online else "离线"
+@bot.on_startup
+async def ready(b: Bot):
+	me = await b.client.fetch_me()
+	identity = me.username + '#' + me.identify_num
+	availability = "在线" if me.online else "离线"
 	print(f"机器人已{availability}，当前身份：{identity}")
 
 @bot.command(name="help", desc="展示机器人指令的信息", help='''`help [指令名]`
@@ -42,17 +49,17 @@ async def ready():
 　　　　1个：指定一个指令，显示详细用法。''')
 async def show_help(msg: Message, query: str = ''):
 	if query:
-		cmd = [query, bot.command.get(query)]
+		cmd = bot.command.get(query)
 		await msg.ctx.channel.send(CardMessage(
 			Card(
 				Module.Header(f"机器人帮助－{query}指令"),
 				Module.Divider(),
 				Module.Section(
-					Element.Text(cmd[1].help, type=CardTypes.Text.KMD)
+					Element.Text(cmd.help, type=CardTypes.Text.KMD)
 				),
 				Module.Context(f"记得给指令添加「{prefix}」前缀"),
 				theme=CardTypes.Theme.INFO
-			) if cmd[1] else Card(
+			) if cmd else Card(
 				Module.Header(f"机器人帮助－错误"),
 				Module.Divider(),
 				Module.Section(
@@ -80,8 +87,9 @@ async def show_help(msg: Message, query: str = ''):
 async def greet(msg: Message):
     await msg.ctx.channel.send("你好！我叫東雲CABAL（東雲カバール，Shinonome CABAL），是北非的旧CABAL核心被毁后经由东云研究所的博士重制而来的。目前利用多余算力在这儿打份零工，给所里赚点牛奶钱。")
 
-@bot.command(name="dice", desc="生成随机整数", help='''`roll [最小值 [最大值]]`
+@bot.command(name="dice", desc="生成随机整数", help='''`dice [最小值 [最大值]]`
 【描述】在一定范围内随机生成一个整数。
+　　　　取值范围两侧包含。
 【参数】0个：默认范围在1至6间；
 　　　　1个：只规定最小值；
 　　　　2个：同时规定最大值与最小值。''')
@@ -89,11 +97,12 @@ async def roll(msg: Message, lower: int = 1, upper: int = 6):
     result = randint(lower, upper)
     await msg.reply(f"随机生成的{lower}至{upper}间的数字为：{result}")
 
-@bot.command(name="prefix", desc="更改指令前缀", help='''`prefix [新前缀]`
+@bot.command(name="prefix", rules=[CmdRule.is_bot_mentioned(bot)], desc="更改指令前缀", help='''`prefix @机器人 [新前缀]`
 【描述】修改触发机器人指令的前缀。
-【参数】0个：默认修改为「/」；
+【参数】（去除提及机器人的参数后）
+　　　　0个：默认修改为「/」；
 　　　　1个：修改为指定的符号。''')
-async def change_prefix(msg: Message, symbol: str = '/'):
+async def change_prefix(msg: Message, mention: str, symbol: str = '/'):
 	if symbol in {'!', '$', '%', '.', '/', '>'}:
 		bot.command.update_prefixes(symbol)
 		global prefix; prefix = symbol
@@ -130,7 +139,7 @@ async def send_card(msg: Message, *contents: str):
 			"theme": "primary",
 			"modules": [{
 				"type": "section",
-				"text": "''' + (raw if raw else "卡片消息演示") + '''"
+				"text": "''' + (raw or "卡片消息演示") + '''"
 			}]
 		}]'''
 	try:
@@ -178,8 +187,8 @@ async def assign_role(b: Bot, event: Event):
 	values = event.body['value'].split('|')
 	v = dict(values[i].split('=') for i in range(0, len(values)) if '=' in values[i])
 	if ('role' in v) and ('guild' in v) and ('code' in v) and (v['code'] == os.environ['CODE']):
-		g = await b.fetch_guild(v['guild'])
-		u = await b.fetch_user(event.body['user_id'])
+		g = await b.client.fetch_guild(v['guild'])
+		u = await b.client.fetch_user(event.body['user_id'])
 		await g.grant_role(u, v['role'])
 
 bot.command.update_prefixes(prefix)
