@@ -55,7 +55,7 @@ async def show_help(msg: Message, query: str = ''):
 				Module.Header(f"机器人帮助－{query}指令"),
 				Module.Divider(),
 				Module.Section(
-					Element.Text(cmd.help, type=CardTypes.Text.KMD)
+					Element.Text(cmd.help, CardTypes.Text.KMD)
 				),
 				Module.Context(f"记得给指令添加「{prefix}」前缀"),
 				theme=CardTypes.Theme.INFO
@@ -173,7 +173,7 @@ async def offer_role(msg: Message, role: str = ''):
 			Module.Header("开始聊天"),
 			Module.Divider(),
 			Module.Section(
-				Element.Text("本服务器内默认角色无法发言。如果您已**阅读并同意**上述服务器规定，请*点击按钮*", type=CardTypes.Text.KMD)
+				Element.Text("本服务器内默认角色无法发言。如果您已**阅读并同意**上述服务器规定，请*点击按钮*", CardTypes.Text.KMD)
 			),
 			Module.ActionGroup(
 				Element.Button("获取发言权限", value=params)
